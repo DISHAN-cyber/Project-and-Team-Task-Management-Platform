@@ -9,6 +9,7 @@ import userRoutes from './routes/user.routes';
 import projectRoutes from './routes/project.routes';
 import taskRoutes from './routes/task.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import tmRoutes from './routes/tm.routes'; // <-- ADD THIS LINE
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -23,10 +24,9 @@ app.use(
 app.use(express.json());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// Increased rate limit for development/testing to prevent accidental lockouts
 const authLimiter = rateLimit({ 
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500 // Increased from 50 to 500
+  windowMs: 15 * 60 * 1000, 
+  max: 500 
 });
 app.use('/api/auth', authLimiter);
 
@@ -37,6 +37,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/tm', tmRoutes); // <-- ADD THIS LINE
 
 app.use(notFoundHandler);
 app.use(errorHandler);
