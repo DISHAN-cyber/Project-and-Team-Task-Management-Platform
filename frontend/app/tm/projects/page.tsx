@@ -3,66 +3,42 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
-import { FiFolder, FiClock, FiCheckCircle, FiAlertCircle, FiCalendar, FiUsers } from 'react-icons/fi';
+import { FiFolder, FiClock, FiCheckCircle, FiAlertCircle, FiCalendar, FiUsers, FiRefreshCw } from 'react-icons/fi';
 
-// Mock TM-specific projects data (ONLY projects assigned to THIS team member)
-const mockTMProjects = [
-  {
-    id: 'tm-proj1',
-    name: 'TaskFlow Website Relaunch',
-    description: 'Redesign and rebuild the public marketing site with a new CMS.',
-    status: 'active',
-    progress: 75,
-    role: 'Designer',
-    tasksAssigned: 5,
-    tasksCompleted: 3,
-    dueDate: 'Mar 30, 2026',
-    projectManager: 'Priya Manager',
-    teamMembers: [
-      { name: 'Malik Member', initials: 'MM', color: 'bg-green-500' },
-      { name: 'Sofia Smith', initials: 'SS', color: 'bg-pink-500' },
-    ],
-  },
-  {
-    id: 'tm-proj2',
-    name: 'Mobile App v2.0',
-    description: 'Major update to the iOS and Android applications with new features.',
-    status: 'active',
-    progress: 45,
-    role: 'Developer',
-    tasksAssigned: 8,
-    tasksCompleted: 2,
-    dueDate: 'Jun 15, 2026',
-    projectManager: 'Priya Manager',
-    teamMembers: [
-      { name: 'Malik Member', initials: 'MM', color: 'bg-green-500' },
-    ],
-  },
-  {
-    id: 'tm-proj3',
-    name: 'E-Commerce Platform',
-    description: 'Build a new online store with payment integration.',
-    status: 'upcoming',
-    progress: 0,
-    role: 'Developer',
-    tasksAssigned: 0,
-    tasksCompleted: 0,
-    dueDate: 'Sep 30, 2026',
-    projectManager: 'Priya Manager',
-    teamMembers: [],
-  },
-];
+interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  progress: number;
+  myTasks: number;
+  completedTasks: number;
+  dueDate: string | null;
+  role: string;
+  projectManager: string;
+}
+
+interface Stats {
+  total: number;
+  active: number;
+  completed: number;
+  upcoming: number;
+  totalTasks: number;
+}
 
 export default function TMProjectsPage() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [isDark, setIsDark] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
-  const [projects, setProjects] = useState(mockTMProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [stats, setStats] = useState<Stats>({ total: 0, active: 0, completed: 0, upcoming: 0, totalTasks: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   // RBAC Protection - Only Team Members can access
   useEffect(() => {
-    if (!loading && user) {
+    if (!authLoading && user) {
       const normalizedRole = user.role.toUpperCase().replace(/\s+/g, '_');
       if (normalizedRole !== 'TEAM_MEMBER') {
         if (normalizedRole === 'PROJECT_MANAGER') {
@@ -72,36 +48,85 @@ export default function TMProjectsPage() {
         }
       }
     }
-  }, [user, loading, router]);
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     const saved = localStorage.getItem('theme');
     setIsDark(saved === 'dark');
   }, []);
 
+  // Fetch Projects from Backend
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!user) return;
+      
+      setIsLoading(true);
+      setError('');
+      
+      try {
+        // Get the token using the EXACT key name from your auth-context.tsx
+        const token = localStorage.getItem('taskflow_token');
+        
+        if (!token) {
+          setError('No authentication token found. Please log out and log in again.');
+          setIsLoading(false);
+          return;
+        }
+        
+        const response = await fetch('http://localhost:4000/api/tm/projects', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch projects');
+        }
+
+        const result = await response.json();
+        
+        if (result.success) {
+          setProjects(result.data.projects);
+          setStats(result.data.stats);
+        } else {
+          setError(result.error || 'Failed to load projects');
+        }
+      } catch (err) {
+        console.error('Error fetching projects:', err);
+        setError('Could not connect to the backend server. Is it running on port 4000?');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProjects();
+  }, [user]);
+
   const filteredProjects = projects.filter((project) => {
     if (activeFilter === 'all') return true;
-    return project.status === activeFilter;
+    // Map frontend 'upcoming' filter to backend 'planned' status
+    const filterStatus = activeFilter === 'upcoming' ? 'planned' : activeFilter;
+    return project.status === filterStatus;
   });
-
-  const stats = {
-    total: projects.length,
-    active: projects.filter(p => p.status === 'active').length,
-    completed: projects.filter(p => p.status === 'completed').length,
-    upcoming: projects.filter(p => p.status === 'upcoming').length,
-    totalTasks: projects.reduce((acc, curr) => acc + curr.tasksAssigned, 0),
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
       case 'completed': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'upcoming': return 'bg-amber-100 text-amber-700 border-amber-200';
+      case 'planned': return 'bg-amber-100 text-amber-700 border-amber-200'; // Matches backend PLANNED enum
       default: return 'bg-slate-100 text-slate-700 border-slate-200';
     }
   };
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (authLoading || isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <FiRefreshCw className="w-8 h-8 animate-spin text-indigo-600" />
+        <span className="ml-2 text-slate-600">Loading projects...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -112,6 +137,13 @@ export default function TMProjectsPage() {
           Projects you are contributing to.
         </p>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -144,7 +176,7 @@ export default function TMProjectsPage() {
 
         <div className={`p-5 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
           <div className="flex items-center justify-between mb-3">
-            <p className={`text-xs font-bold tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>UPCOMING</p>
+            <p className={`text-xs font-bold tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>PLANNED</p>
             <FiAlertCircle className="w-5 h-5 text-amber-500" />
           </div>
           <p className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{stats.upcoming}</p>
@@ -159,7 +191,7 @@ export default function TMProjectsPage() {
             { id: 'all', label: 'All', count: projects.length },
             { id: 'active', label: 'Active', count: stats.active },
             { id: 'completed', label: 'Completed', count: stats.completed },
-            { id: 'upcoming', label: 'Upcoming', count: stats.upcoming },
+            { id: 'upcoming', label: 'Planned', count: stats.upcoming },
           ].map((filter) => (
             <button
               key={filter.id}
@@ -188,12 +220,12 @@ export default function TMProjectsPage() {
                     <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'} mb-1`}>
                       {project.name}
                     </h3>
-                    <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'} line-clamp-2`}>
                       {project.description}
                     </p>
                   </div>
                   <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border capitalize ${getStatusColor(project.status)}`}>
-                    {project.status}
+                    {project.status === 'planned' ? 'Planned' : project.status}
                   </span>
                 </div>
 
@@ -215,42 +247,23 @@ export default function TMProjectsPage() {
                 <div className={`grid grid-cols-2 gap-3 mb-4 p-3 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-slate-50'}`}>
                   <div>
                     <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>My Tasks</p>
-                    <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{project.tasksAssigned}</p>
+                    <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{project.myTasks}</p>
                   </div>
                   <div>
                     <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Completed</p>
-                    <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{project.tasksCompleted}</p>
+                    <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{project.completedTasks}</p>
                   </div>
                 </div>
 
                 {/* Footer Info */}
                 <div className={`pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-100'} space-y-3`}>
-                  {/* Team */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center -space-x-2">
-                      {project.teamMembers.slice(0, 3).map((member, i) => (
-                        <div key={i} className={`w-7 h-7 rounded-full ${member.color} border-2 ${isDark ? 'border-slate-800' : 'border-white'} flex items-center justify-center text-white text-[10px] font-bold`} title={member.name}>
-                          {member.initials}
-                        </div>
-                      ))}
-                      {project.teamMembers.length === 0 && (
-                        <div className={`w-7 h-7 rounded-full ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'} border-2 ${isDark ? 'border-slate-800' : 'border-white'} flex items-center justify-center text-[10px]`}>
-                          ?
-                        </div>
-                      )}
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-indigo-900/30 text-indigo-300' : 'bg-indigo-50 text-indigo-700'}`}>
-                      {project.role}
-                    </span>
-                  </div>
-
                   {/* PM & Due Date */}
                   <div className="flex items-center justify-between text-xs">
                     <span className={`flex items-center gap-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       <FiUsers className="w-3 h-3" /> {project.projectManager}
                     </span>
                     <span className={`flex items-center gap-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                      <FiCalendar className="w-3 h-3" /> {project.dueDate}
+                      <FiCalendar className="w-3 h-3" /> {project.dueDate || 'No due date'}
                     </span>
                   </div>
                 </div>
