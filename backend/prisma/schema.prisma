@@ -58,6 +58,7 @@ model User {
   createdTasks    Task[]           @relation("TaskCreator")
   comments        Comment[]
   activityLogs    ActivityLog[]
+  resetTokens     PasswordResetToken[] // <-- NEW: Link to reset tokens
 
   @@index([role])
   @@map("users")
@@ -162,4 +163,18 @@ model ActivityLog {
   @@index([userId])
   @@index([projectId])
   @@map("activity_logs")
+}
+
+// NEW: Password Reset Tokens for the "Forgot Password" feature
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@map("password_reset_tokens")
 }

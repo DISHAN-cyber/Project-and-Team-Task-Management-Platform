@@ -42,7 +42,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await api.post<{ user: User; token: string }>('/auth/login', { email, password });
         setToken(res.token);
         setUser(res.user);
-        router.push('/dashboard');
+        
+        // Normalize the role string (e.g., "Project Manager" -> "PROJECT_MANAGER")
+        const normalizedRole = res.user.role.toUpperCase().replace(/\s+/g, '_');
+        console.log('Normalized Role:', normalizedRole); // Check browser console to verify!
+        
+        // Redirect based on normalized user role
+        if (normalizedRole === 'PROJECT_MANAGER') {
+          router.push('/pm');
+        } else if (normalizedRole === 'TEAM_MEMBER') {
+          router.push('/tm');
+        } else {
+          router.push('/admin');
+        }
       } catch (err) {
         setError(err instanceof ApiError ? err.message : 'Login failed');
         throw err;
@@ -58,7 +70,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await api.post<{ user: User; token: string }>('/auth/register', { name, email, password });
         setToken(res.token);
         setUser(res.user);
-        router.push('/dashboard');
+        
+        const normalizedRole = res.user.role.toUpperCase().replace(/\s+/g, '_');
+        
+        if (normalizedRole === 'PROJECT_MANAGER') {
+          router.push('/pm');
+        } else if (normalizedRole === 'TEAM_MEMBER') {
+          router.push('/tm');
+        } else {
+          router.push('/admin');
+        }
       } catch (err) {
         setError(err instanceof ApiError ? err.message : 'Registration failed');
         throw err;

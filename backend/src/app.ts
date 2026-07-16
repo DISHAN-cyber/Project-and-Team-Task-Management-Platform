@@ -23,8 +23,11 @@ app.use(
 app.use(express.json());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// Basic rate limiting to slow down brute-force login attempts
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50 });
+// Increased rate limit for development/testing to prevent accidental lockouts
+const authLimiter = rateLimit({ 
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500 // Increased from 50 to 500
+});
 app.use('/api/auth', authLimiter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
