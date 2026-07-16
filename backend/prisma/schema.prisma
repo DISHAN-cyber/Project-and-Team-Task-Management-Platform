@@ -58,7 +58,7 @@ model User {
   createdTasks    Task[]           @relation("TaskCreator")
   comments        Comment[]
   activityLogs    ActivityLog[]
-  resetTokens     PasswordResetToken[] // <-- NEW: Link to reset tokens
+  resetTokens     PasswordResetToken[]
 
   @@index([role])
   @@map("users")
@@ -69,13 +69,14 @@ model Project {
   name        String
   description String?
   status      ProjectStatus @default(PLANNED)
+  progress    Int           @default(0) // <-- ADDED: Progress percentage (0-100)
   startDate   DateTime?
   endDate     DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
   managerId   String
-  manager     User            @relation("ProjectManager", fields: [managerId], references: [id], onDelete: Cascade)
+  manager     User          @relation("ProjectManager", fields: [managerId], references: [id], onDelete: Cascade)
 
   members     ProjectMember[]
   tasks       Task[]
@@ -165,7 +166,7 @@ model ActivityLog {
   @@map("activity_logs")
 }
 
-// NEW: Password Reset Tokens for the "Forgot Password" feature
+// Password Reset Tokens for the "Forgot Password" feature
 model PasswordResetToken {
   id        String   @id @default(uuid())
   token     String   @unique
