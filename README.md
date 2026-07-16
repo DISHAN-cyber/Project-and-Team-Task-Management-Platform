@@ -301,18 +301,7 @@ A basic GitHub Actions workflow is included to automatically:
 
 ---
 
-# AI Usage
 
-The following AI tools were used during development:
-
-* ChatGPT
-
-  * Project planning
-  * Code explanations
-  * README documentation
-  * Debugging assistance
-  * API design suggestions
-  * Database relationship guidance
 
 All implementation, testing, customization, and final integration were completed manually.
 
