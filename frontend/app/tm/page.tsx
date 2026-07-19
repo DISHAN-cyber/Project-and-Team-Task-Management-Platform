@@ -1,363 +1,352 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { FiCheckCircle, FiClock, FiTrendingUp, FiFolder, FiClipboard, FiAward, FiX, FiMessageSquare, FiBarChart2 } from 'react-icons/fi';
+import { useRouter } from 'next/navigation';
+import { FiUpload, FiTrash2, FiFile, FiRefreshCw, FiCheckCircle, FiClock } from 'react-icons/fi';
 
-export default function TMDashboard() {
-  const { user, loading } = useAuth();
+interface TaskFile {
+  id: string;
+  name: string;
+  size: number;
+  mimeType: string;
+  url: string;
+  uploadedAt: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  dueDate: string | null;
+  projectName: string;
+  assignedBy: string;
+  files: TaskFile[];
+}
+
+interface Stats {
+  total: number;
+  inProgress: number;
+  completed: number;
+  highPriority: number;
+}
+
+export default function TMTasksPage() {
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [isDark, setIsDark] = useState(false);
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [stats, setStats] = useState<Stats>({ total: 0, inProgress: 0, completed: 0, highPriority: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [uploadingTaskId, setUploadingTaskId] = useState<string | null>(null);
   
-  // Form states
-  const [selectedTask, setSelectedTask] = useState('');
-  const [status, setStatus] = useState('in_progress');
-  const [progress, setProgress] = useState(75);
-  const [notes, setNotes] = useState('');
+  // Hidden file input ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentUploadTaskId, setCurrentUploadTaskId] = useState<string | null>(null);
 
   // RBAC Protection
   useEffect(() => {
-    if (!loading && user) {
+    if (!authLoading && user) {
       const normalizedRole = user.role.toUpperCase().replace(/\s+/g, '_');
       if (normalizedRole !== 'TEAM_MEMBER') {
-        if (normalizedRole === 'PROJECT_MANAGER') {
-          router.replace('/pm');
-        } else if (normalizedRole === 'ADMIN') {
-          router.replace('/admin');
-        } else {
-          router.replace('/auth/login');
-        }
+        if (normalizedRole === 'PROJECT_MANAGER') router.replace('/pm');
+        else if (normalizedRole === 'ADMIN') router.replace('/admin');
       }
     }
-  }, [user, loading, router]);
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     const saved = localStorage.getItem('theme');
     setIsDark(saved === 'dark');
   }, []);
 
-  const stats = [
-    { label: 'MY PROJECTS', value: '3', sub: '2 active this week', icon: FiFolder },
-    { label: 'MY TASKS', value: '9', sub: '4 due today', icon: FiClipboard },
-    { label: 'COMPLETED', value: '14', sub: 'Strong weekly pace', icon: FiCheckCircle },
-    { label: 'PRODUCTIVITY', value: '87%', sub: 'Above team average', icon: FiTrendingUp },
-  ];
+  // Fetch Tasks from Backend
+  const fetchTasks = async () => {
+    if (!user) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('taskflow_token');
+      const response = await fetch('http://localhost:4000/api/tm/tasks', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
 
-  const progressBars = [
-    { label: "Today's completed tasks", value: 60 },
-    { label: 'Current sprint contribution', value: 75 },
-    { label: 'Task quality score', value: 90 },
-    { label: 'Time utilization', value: 68 },
-  ];
-
-  const quickBars = [
-    { label: 'Focus level', value: 'High', percent: 85 },
-    { label: 'Pending reviews', value: '3 items', percent: 30 },
-    { label: 'Daily goal', value: '7/9', percent: 78 },
-  ];
-
-  const tasksQueue = [
-    {
-      id: 1,
-      priority: 'HIGH PRIORITY',
-      priorityColor: 'text-red-600',
-      title: 'Finish dashboard layout updates',
-      desc: 'Implement top search, live timeline, and performance bars.',
-      due: 'Due today',
-    },
-    {
-      id: 2,
-      priority: 'IN PROGRESS',
-      priorityColor: 'text-blue-600',
-      title: 'Review project updates',
-      desc: 'Check comments from the project manager and update notes.',
-      due: 'Tomorrow',
-    },
-    {
-      id: 3,
-      priority: 'COMPLETED',
-      priorityColor: 'text-emerald-600',
-      title: 'Submit sprint summary',
-      desc: 'Delivered notes and completion updates to the team lead.',
-      due: 'Done',
-    },
-  ];
-
-  const handleUpdateProgress = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Updating progress:', {
-      task: selectedTask,
-      status,
-      progress,
-      notes,
-      timestamp: new Date().toISOString()
-    });
-    
-    alert(`Progress updated successfully!\n\nTask: ${selectedTask || 'General Update'}\nStatus: ${status.replace('_', ' ').toUpperCase()}\nProgress: ${progress}%\nNotes: ${notes || 'No notes added'}`);
-    
-    setShowUpdateModal(false);
-    setSelectedTask('');
-    setStatus('in_progress');
-    setProgress(75);
-    setNotes('');
+      if (!response.ok) throw new Error('Failed to fetch tasks');
+      const result = await response.json();
+      
+      if (result.success) {
+        setTasks(result.data.tasks);
+        setStats(result.data.stats);
+      } else {
+        setError(result.error || 'Failed to load tasks');
+      }
+    } catch (err) {
+      console.error('Error fetching tasks:', err);
+      setError('Could not connect to the backend server.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  if (loading) {
+  useEffect(() => {
+    fetchTasks();
+  }, [user]);
+
+  // Handle Upload Button Click
+  const handleUploadClick = (taskId: string) => {
+    setCurrentUploadTaskId(taskId);
+    fileInputRef.current?.click(); // Triggers the hidden file input
+  };
+
+  // Handle File Selection and Upload
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    console.log('--- UPLOAD DEBUG START ---');
+    console.log('1. Files selected:', files);
+    console.log('2. Current Task ID:', currentUploadTaskId);
+    
+    if (!files || files.length === 0 || !currentUploadTaskId) {
+      console.log('❌ Aborting: No files or no task ID');
+      return;
+    }
+
+    setUploadingTaskId(currentUploadTaskId);
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach(file => {
+        formData.append('files', file);
+        console.log('3. Appended to FormData:', file.name, file.size);
+      });
+
+      const token = localStorage.getItem('taskflow_token');
+      console.log('4. Token exists:', !!token);
+      
+      const uploadUrl = `http://localhost:4000/api/tm/tasks/${currentUploadTaskId}/upload`;
+      console.log('5. Sending POST request to:', uploadUrl);
+
+      const response = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      console.log('6. Response status:', response.status);
+      const result = await response.json();
+      console.log('7. Response data:', result);
+      
+      if (result.success) {
+        alert(`Successfully uploaded ${result.data.files.length} file(s)!`);
+        await fetchTasks(); // Refresh to show new files
+      } else {
+        alert('Upload failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('❌ Upload error:', err);
+      alert('Failed to upload files. Check console for details.');
+    } finally {
+      setUploadingTaskId(null);
+      setCurrentUploadTaskId(null);
+      if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
+      console.log('--- UPLOAD DEBUG END ---');
+    }
+  };
+
+  // Handle File Delete
+  const handleDeleteFile = async (taskId: string, fileId: string) => {
+    if (!confirm('Are you sure you want to delete this file?')) return;
+    
+    try {
+      const token = localStorage.getItem('taskflow_token');
+      const response = await fetch(`http://localhost:4000/api/tm/tasks/${taskId}/files/${fileId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        await fetchTasks(); // Refresh
+      } else {
+        alert('Failed to delete file');
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert('Failed to delete file');
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'in_progress': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'done': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      case 'in_review': return 'bg-purple-100 text-purple-700 border-purple-200';
+      default: return 'bg-slate-100 text-slate-700 border-slate-200';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 'text-red-600';
+      case 'high': return 'text-orange-600';
+      case 'medium': return 'text-yellow-600';
+      default: return 'text-slate-500';
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  if (authLoading || isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-sm text-slate-500 animate-pulse">Loading dashboard…</p>
+      <div className="flex items-center justify-center h-64">
+        <FiRefreshCw className="w-8 h-8 animate-spin text-indigo-600" />
+        <span className="ml-2 text-slate-600">Loading tasks...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            Welcome back, {user?.name?.split(' ')[0] || 'Team Member'}!
-          </h1>
-          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Stay on top of your tasks, project progress, and daily workload.
-          </p>
-        </div>
-        <button 
-          onClick={() => setShowUpdateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-        >
-          <FiCheckCircle className="w-4 h-4" />
-          Update Progress
-        </button>
+      <div>
+        <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>My Tasks</h1>
+        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          Tasks assigned to you. Click "Upload" to attach files.
+        </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => (
-          <div key={i} className={`p-5 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
-            <p className={`text-xs font-bold tracking-wider mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              {stat.label}
-            </p>
-            <div className="flex items-end justify-between">
-              <h3 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{stat.value}</h3>
-              <stat.icon className={`w-5 h-5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
-            </div>
-            <p className={`text-xs mt-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{stat.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Middle Section: Progress & Quick Bars */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Progress Bars (Left 2/3) */}
-        <div className={`lg:col-span-2 p-6 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>My progress bars</h2>
-            <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Daily performance</span>
-          </div>
-          <div className="space-y-5">
-            {progressBars.map((bar, i) => (
-              <div key={i}>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{bar.label}</span>
-                  <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{bar.value}%</span>
-                </div>
-                <div className={`w-full ${isDark ? 'bg-slate-700' : 'bg-slate-100'} rounded-full h-2 overflow-hidden`}>
-                  <div className="bg-indigo-600 h-2 rounded-full" style={{ width: `${bar.value}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Quick Bars (Right 1/3) */}
-        <div className={`p-6 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
-          <h2 className={`text-lg font-bold mb-6 ${isDark ? 'text-white' : 'text-slate-900'}`}>Quick bars</h2>
-          <div className="space-y-6">
-            {quickBars.map((bar, i) => (
-              <div key={i} className={`p-3 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-slate-50'} border ${isDark ? 'border-slate-600' : 'border-slate-200'}`}>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{bar.label}</span>
-                  <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{bar.value}</span>
-                </div>
-                <div className={`w-full ${isDark ? 'bg-slate-600' : 'bg-slate-200'} rounded-full h-1.5 overflow-hidden`}>
-                  <div className="bg-indigo-600 h-1.5 rounded-full" style={{ width: `${bar.percent}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Tasks Queue */}
-      <div className={`rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm overflow-hidden`}>
-        <div className={`p-6 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'} flex items-center justify-between`}>
-          <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>My tasks queue</h2>
-          <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Sorted by priority</span>
-        </div>
-
-        <div className={`divide-y ${isDark ? 'divide-slate-700' : 'divide-slate-200'}`}>
-          {tasksQueue.map((task, i) => (
-            <div 
-              key={i} 
-              className={`p-5 hover:${isDark ? 'bg-slate-700' : 'bg-slate-50'} transition-colors cursor-pointer`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <p className={`text-xs font-bold tracking-wider mb-1 ${task.priorityColor}`}>
-                    {task.priority}
-                  </p>
-                  <h3 className={`font-semibold text-base mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    {task.title}
-                  </h3>
-                  <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {task.desc}
-                  </p>
-                </div>
-                <span className={`text-sm font-medium whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                  {task.due}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Update Progress Modal */}
-      {showUpdateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
-          <div className={`relative w-full max-w-lg rounded-2xl shadow-2xl ${isDark ? 'bg-slate-800' : 'bg-white'} p-6`}>
-            {/* Modal Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <FiBarChart2 className="w-5 h-5 text-indigo-600" />
-                </div>
-                <div>
-                  <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Update Progress</h2>
-                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Share your progress with the team</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setShowUpdateModal(false)}
-                className={`p-2 rounded-lg ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'} transition-colors`}
-              >
-                <FiX className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Form */}
-            <form onSubmit={handleUpdateProgress} className="space-y-5">
-              {/* Task Selection */}
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <FiClipboard className="inline w-4 h-4 mr-1" />
-                  Select Task (Optional)
-                </label>
-                <select
-                  value={selectedTask}
-                  onChange={(e) => setSelectedTask(e.target.value)}
-                  className={`w-full px-4 py-2.5 rounded-lg border ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-200 text-slate-900'} focus:outline-none focus:ring-2 focus:ring-indigo-500`}
-                >
-                  <option value="">General Update</option>
-                  {tasksQueue.map((task) => (
-                    <option key={task.id} value={task.title}>
-                      {task.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <FiCheckCircle className="inline w-4 h-4 mr-1" />
-                  Current Status
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { value: 'not_started', label: 'Not Started', color: 'bg-slate-400' },
-                    { value: 'in_progress', label: 'In Progress', color: 'bg-blue-500' },
-                    { value: 'completed', label: 'Completed', color: 'bg-emerald-500' },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setStatus(option.value)}
-                      className={`px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
-                        status === option.value
-                          ? `border-indigo-600 bg-indigo-50 text-indigo-700`
-                          : `${isDark ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`
-                      }`}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${option.color}`} />
-                        {option.label}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Progress Slider */}
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <FiTrendingUp className="inline w-4 h-4 mr-1" />
-                  Completion: <span className="text-indigo-600 font-bold">{progress}%</span>
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={progress}
-                  onChange={(e) => setProgress(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                />
-                <div className="flex justify-between text-xs text-slate-500 mt-1">
-                  <span>0%</span>
-                  <span>50%</span>
-                  <span>100%</span>
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <FiMessageSquare className="inline w-4 h-4 mr-1" />
-                  Progress Notes
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="What have you accomplished? Any blockers?"
-                  rows={3}
-                  className={`w-full px-4 py-2.5 rounded-lg border ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'} focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none`}
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowUpdateModal(false)}
-                  className={`flex-1 px-4 py-2.5 rounded-lg border ${isDark ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'} font-medium transition-colors`}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                >
-                  <FiCheckCircle className="w-4 h-4" />
-                  Update Progress
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {error && (
+        <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
       )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <p className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>TOTAL TASKS</p>
+          <p className={`text-2xl font-bold mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{stats.total}</p>
+        </div>
+        <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <p className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>IN PROGRESS</p>
+          <p className={`text-2xl font-bold mt-1 text-blue-600`}>{stats.inProgress}</p>
+        </div>
+        <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <p className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>COMPLETED</p>
+          <p className={`text-2xl font-bold mt-1 text-emerald-600`}>{stats.completed}</p>
+        </div>
+        <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <p className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>HIGH PRIORITY</p>
+          <p className={`text-2xl font-bold mt-1 text-orange-600`}>{stats.highPriority}</p>
+        </div>
+      </div>
+
+      {/* Hidden File Input (accepts multiple files) */}
+      <input 
+        type="file" 
+        multiple 
+        ref={fileInputRef} 
+        className="hidden" 
+        onChange={handleFileChange} 
+      />
+
+      {/* Tasks List */}
+      <div className="space-y-4">
+        {tasks.length > 0 ? (
+          tasks.map((task) => (
+            <div key={task.id} className={`rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-5 shadow-sm`}>
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`px-2 py-0.5 rounded text-xs font-semibold border capitalize ${getStatusColor(task.status)}`}>
+                      {task.status.replace('_', ' ')}
+                    </span>
+                    <span className={`text-xs font-bold uppercase ${getPriorityColor(task.priority)}`}>
+                      {task.priority} Priority
+                    </span>
+                  </div>
+                  <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{task.title}</h3>
+                  <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{task.description || 'No description'}</p>
+                  <div className={`flex flex-wrap gap-4 mt-3 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <span className="flex items-center gap-1"><FiClock className="w-3 h-3" /> Due: {task.dueDate || 'No due date'}</span>
+                    <span className="flex items-center gap-1"><FiFile className="w-3 h-3" /> Project: {task.projectName}</span>
+                  </div>
+                </div>
+                
+                {/* Upload Button */}
+                <button
+                  onClick={() => handleUploadClick(task.id)}
+                  disabled={uploadingTaskId === task.id}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    uploadingTaskId === task.id 
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  }`}
+                >
+                  {uploadingTaskId === task.id ? (
+                    <><FiRefreshCw className="w-4 h-4 animate-spin" /> Uploading...</>
+                  ) : (
+                    <><FiUpload className="w-4 h-4" /> Upload Files</>
+                  )}
+                </button>
+              </div>
+
+              {/* Attached Files Section */}
+              <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
+                <p className={`text-xs font-bold mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  ATTACHED FILES ({task.files.length})
+                </p>
+                {task.files.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {task.files.map((file) => (
+                      <div key={file.id} className={`flex items-center justify-between p-3 rounded-lg border ${isDark ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <FiFile className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
+                          <div className="min-w-0">
+                            <p className={`text-sm font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{file.name}</p>
+                            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatFileSize(file.size)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <a 
+                            href={`http://localhost:4000${file.url}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-slate-600 text-white hover:bg-slate-500' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'}`}
+                          >
+                            View
+                          </a>
+                          <button 
+                            onClick={() => handleDeleteFile(task.id, file.id)}
+                            className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                            title="Delete file"
+                          >
+                            <FiTrash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={`text-sm italic ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>No files attached yet.</p>
+                )}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className={`text-center py-12 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>
+            <FiCheckCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p className="text-lg font-medium">No tasks assigned to you</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
