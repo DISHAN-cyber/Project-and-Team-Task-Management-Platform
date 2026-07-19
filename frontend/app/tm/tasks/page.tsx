@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { 
   FiCheckCircle, FiClock, FiAlertCircle, FiCalendar, FiMoreHorizontal, 
-  FiPaperclip, FiUpload, FiFolder, FiFile, FiX, FiPlus 
+  FiPaperclip, FiUpload, FiFolder, FiFile, FiX, FiPlus, FiEye, FiTrash2 
 } from 'react-icons/fi';
 
 // Mock TM-specific tasks data
@@ -136,6 +136,23 @@ export default function TMTasksPage() {
     setUploadingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  // ✅ ADDED: Delete file function
+  const handleDeleteFile = (taskId: string, fileIndex: number) => {
+    if (!confirm('Are you sure you want to delete this file?')) return;
+    
+    setTasks(prev => prev.map(task => {
+      if (task.id === taskId) {
+        const newFiles = task.uploadedFiles.filter((_, idx) => idx !== fileIndex);
+        return {
+          ...task,
+          uploadedFiles: newFiles,
+          attachments: newFiles.length,
+        };
+      }
+      return task;
+    }));
+  };
+
   const handleUpload = async (taskId: string) => {
     if (!selectedTask || uploadingFiles.length === 0) return;
 
@@ -165,7 +182,7 @@ export default function TMTasksPage() {
     setUploadingFiles([]);
     setShowUploadModal(false);
     setSelectedTask(null);
-    alert(`Successfully uploaded ${newFiles.length} file(s) to "${selectedTask.title}"`);
+    alert(`Successfully uploaded ${newFiles.length} file(s) to "${selectedTask?.title}"`);
   };
 
   const openUploadModal = (task: typeof mockTMTasks[0]) => {
@@ -340,7 +357,7 @@ export default function TMTasksPage() {
                   </div>
                 </div>
 
-                {/* Show uploaded files if any */}
+                {/* ✅ UPDATED: Show uploaded files with View & Delete buttons */}
                 {task.uploadedFiles && task.uploadedFiles.length > 0 && (
                   <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
                     <p className={`text-xs font-semibold mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -357,6 +374,33 @@ export default function TMTasksPage() {
                             <p className={`text-xs font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{file.name}</p>
                             <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{file.size} • {file.uploadedAt}</p>
                           </div>
+                          
+                          {/* 👁️ VIEW BUTTON */}
+<button 
+  onClick={() => {
+    // For mock data, show alert
+    // In real app, this would open: window.open(`http://localhost:4000${file.url}`, '_blank')
+    if (file.name.endsWith('.pdf')) {
+      // Open a sample PDF or show message
+      alert(`Opening PDF: ${file.name}\nSize: ${file.size}\nIn production, this opens the actual PDF file.`);
+    } else {
+      alert(`Opening file: ${file.name}\nSize: ${file.size}`);
+    }
+  }}
+  className={`p-1.5 rounded transition-colors ${isDark ? 'hover:bg-slate-600 text-slate-300' : 'hover:bg-slate-200 text-slate-600'}`}
+  title="View File"
+>
+  <FiEye className="w-3.5 h-3.5" />
+</button>
+                          
+                          {/* 🗑️ DELETE BUTTON */}
+                          <button 
+                            onClick={() => handleDeleteFile(task.id, idx)}
+                            className={`p-1.5 rounded transition-colors ${isDark ? 'hover:bg-red-900 text-red-400' : 'hover:bg-red-100 text-red-600'}`}
+                            title="Delete File"
+                          >
+                            <FiTrash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       ))}
                     </div>
