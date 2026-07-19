@@ -1,179 +1,350 @@
-# TaskFlow — Project & Team Task Management Platform
+# Project and Team Task Management Platform
 
-A full-stack project and task management platform with three roles — **Administrator**,
-**Project Manager**, and **Team Member** — built with Next.js, Node.js/Express, Prisma, and
-PostgreSQL.
+A full-stack web application developed as part of the **Intern Full Stack Developer** practical assignment for **CyphLab (Private) Limited**.
 
-- 📄 [Feature completion report](docs/Feature_Completion_Report.md)
-- 🗂️ [Entity Relationship Diagram](docs/ERD.md)
-- 🧭 [Use Case Diagram](docs/UseCaseDiagram.md)
-- 🏗️ [System architecture](docs/Architecture.md)
-- 📚 [API documentation](docs/API_Documentation.md) · [Postman collection](docs/postman_collection.json)
-- ⚙️ [CI/CD explanation](docs/CI_CD_Explanation.md)
+The platform enables organizations to manage projects, assign tasks, monitor progress, and collaborate efficiently through a secure role-based system.
 
-## Tech stack
+---
 
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS |
-| Backend | Node.js, Express, TypeScript |
-| ORM / Database | Prisma + PostgreSQL |
-| Auth | JWT (bcrypt password hashing), role-based access control |
-| Validation | Zod |
-| CI/CD | GitHub Actions (lint, type-check, test, build) |
+# Tech Stack
 
-## Project structure
+
+https://github.com/user-attachments/assets/a6a32900-32ba-4136-a957-182b547d54ef
+
+
+
+## Frontend
+
+* Next.js
+* TypeScript
+* Tailwind CSS
+
+## Backend
+
+* Node.js
+* Express.js
+* Prisma ORM
+
+## Database
+
+* PostgreSQL (Neon)
+
+## Deployment
+
+* Frontend: Vercel
+* Backend: Railway
+* Database: Neon PostgreSQL
+
+## Authentication
+
+* JWT (JSON Web Token)
+* Role-Based Access Control (RBAC)
+
+---
+
+# User Roles
+
+## Administrator
+
+* Manage users
+* Manage roles
+* Create, edit, and delete projects
+* Manage project assignments
+* View system dashboard
+* Monitor overall project progress
+
+## Project Manager
+
+* Create projects
+* Assign team members
+* Create, update, and delete tasks
+* Set task priorities and deadlines
+* Track project progress
+
+## Team Member
+
+* View assigned projects
+* View assigned tasks
+* Update task status
+* Add task comments
+* Track personal task progress
+
+---
+
+# Features
+
+### Authentication
+
+* Secure Login
+* JWT Authentication
+* Password Hashing
+* Protected Routes
+* Role-Based Authorization
+
+### Project Management
+
+* Create Projects
+* Update Projects
+* Delete Projects
+* Assign Team Members
+* Project Progress Tracking
+
+### Task Management
+
+* Create Tasks
+* Assign Tasks
+* Update Task Status
+* Set Priority Levels
+* Due Date Management
+
+### User Management
+
+* User Registration
+* User Profile Management
+* Role Management
+* Account Status Management
+
+### Dashboard
+
+* Project Statistics
+* Task Statistics
+* User Statistics
+* Progress Overview
+
+### Additional Features
+
+* Responsive Design
+* Form Validation
+* Error Handling
+* Loading Indicators
+* Toast Notifications
+* RESTful API
+* Clean UI
+* Secure API Endpoints
+
+---
+
+# Project Structure
 
 ```
 taskflow/
-├── backend/           Express + Prisma REST API
-│   ├── prisma/        schema.prisma, seed.ts
+│
+├── frontend/
+│   ├── app/
+│   ├── components/
+│   ├── lib/
+│   ├── services/
+│   ├── hooks/
+│   └── types/
+│
+├── backend/
 │   ├── src/
 │   │   ├── controllers/
-│   │   ├── middleware/   (auth, RBAC, validation, error handling)
+│   │   ├── middleware/
 │   │   ├── routes/
-│   │   ├── validators/   Zod schemas
-│   │   └── utils/        JWT + password helpers
-│   └── tests/          Jest + Supertest
-├── frontend/          Next.js App Router UI
-│   ├── app/
-│   │   ├── (login) page.tsx, register/
-│   │   └── dashboard/    overview, projects, tasks, users
-│   ├── components/
-│   ├── lib/              API client, auth context
-│   └── types/
-├── docs/              ERD, use case diagram, architecture, API docs, reports
-└── .github/workflows/ci.yml
+│   │   ├── services/
+│   │   ├── utils/
+│   │   └── config/
+│   │
+│   ├── prisma/
+│   └── uploads/
+│
+└── README.md
 ```
 
-## Prerequisites
+---
 
-- Node.js 20+
-- npm 10+
-- A PostgreSQL 14+ database (local install, Docker, or a hosted instance e.g. Supabase/Neon/Railway)
+# Database
 
-## 1. Clone & install
+The application uses **PostgreSQL** hosted on **Neon**.
+
+ORM:
+
+* Prisma ORM
+
+Main Entities
+
+* User
+* Role
+* Project
+* Task
+* ProjectMember
+* Comment
+
+---
+
+# REST API
+
+Authentication
+
+```
+POST /api/auth/register
+POST /api/auth/login
+GET  /api/auth/profile
+```
+
+Users
+
+```
+GET    /api/users
+GET    /api/users/:id
+PUT    /api/users/:id
+DELETE /api/users/:id
+```
+
+Projects
+
+```
+GET    /api/projects
+POST   /api/projects
+PUT    /api/projects/:id
+DELETE /api/projects/:id
+```
+
+Tasks
+
+```
+GET    /api/tasks
+POST   /api/tasks
+PUT    /api/tasks/:id
+DELETE /api/tasks/:id
+```
+
+---
+
+# Environment Variables
+
+## Backend (.env)
+
+```
+PORT=5000
+
+DATABASE_URL=
+
+JWT_SECRET=
+
+CLIENT_URL=
+```
+
+## Frontend (.env.local)
+
+```
+NEXT_PUBLIC_API_URL=
+```
+
+---
+
+# Installation
+
+## Clone Repository
 
 ```bash
-git clone <your-repo-url>
-cd taskflow
+git clone https://github.com/YOUR_USERNAME/Project-and-Team-Task-Management-Platform.git
+
+cd Project-and-Team-Task-Management-Platform
 ```
 
-### Backend
+---
+
+## Backend Setup
 
 ```bash
 cd backend
+
 npm install
-cp .env.example .env
-# Edit .env and set DATABASE_URL to your Postgres connection string, and a JWT_SECRET
+
+npx prisma generate
+
+npx prisma migrate dev
+
+npm run dev
 ```
 
-If you don't already have Postgres running locally, the quickest option is Docker:
+---
 
-```bash
-docker run --name taskflow-db -e POSTGRES_USER=taskflow -e POSTGRES_PASSWORD=taskflow \
-  -e POSTGRES_DB=taskflow -p 5432:5432 -d postgres:16
-```
-
-Then, with `DATABASE_URL="postgresql://taskflow:taskflow@localhost:5432/taskflow?schema=public"`:
-
-```bash
-npm run prisma:generate     # generate the Prisma client
-npm run prisma:migrate      # create tables (prompts for a migration name, e.g. "init")
-npm run prisma:seed         # optional: seed demo accounts + a sample project
-npm run dev                 # starts the API on http://localhost:4000
-```
-
-Demo accounts created by the seed script (password for all: `Password123!`):
-
-| Role | Email |
-|---|---|
-| Administrator | `admin@taskflow.dev` |
-| Project Manager | `pm@taskflow.dev` |
-| Team Member | `member1@taskflow.dev` / `member2@taskflow.dev` |
-
-### Frontend
-
-In a second terminal:
+## Frontend Setup
 
 ```bash
 cd frontend
+
 npm install
-cp .env.example .env.local
-# NEXT_PUBLIC_API_URL should point at the backend, e.g. http://localhost:4000/api
-npm run dev                 # starts the app on http://localhost:3000
+
+npm run dev
 ```
 
-Open `http://localhost:3000`, sign in with one of the demo accounts above (or click the demo
-account buttons on the login page to autofill), and explore.
+---
 
-## 2. Running tests & linting
+# Deployment
 
-```bash
-# Backend
-cd backend
-npm run lint
-npm run build        # type-check + compile
-npm test             # Jest + Supertest (health check, validation, RBAC enforcement)
+## Frontend
 
-# Frontend
-cd frontend
-npm run lint
-npm run build         # type-checks every page and produces a production build
+Vercel
+
+## Backend
+
+Railway
+
+## Database
+
+Neon PostgreSQL
+
+---
+
+# CI/CD
+
+A basic GitHub Actions workflow is included to automatically:
+
+* Install dependencies
+* Run lint checks
+* Build the application
+* Validate successful compilation
+
+---
+
+
+
+All implementation, testing, customization, and final integration were completed manually.
+
+---
+
+# Documentation
+
+The repository includes:
+
+* README
+* Entity Relationship Diagram (ERD)
+* Use Case Diagram
+* System Architecture Diagram
+* API Documentation / Postman Collection
+* Feature Completion Report
+* CI/CD Workflow Explanation
+
+---
+
+# Live Demo
+
+Frontend
+
+```
+https://your-vercel-app.vercel.app
 ```
 
-## 3. Production build
+Backend
 
-```bash
-# Backend
-cd backend && npm run build && npm start
-
-# Frontend
-cd frontend && npm run build && npm start
+```
+https://your-backend.railway.app
 ```
 
-Set `CORS_ORIGIN` in the backend `.env` to your deployed frontend URL, and `NEXT_PUBLIC_API_URL`
-in the frontend to your deployed backend URL, before building for production.
+---
 
-## 4. Deployment notes
+# GitHub Repository
 
-- **Backend**: deployable to Railway, Render, Fly.io, or any Node host with a PostgreSQL add-on.
-  Run `npm run prisma:migrate deploy` (or `prisma:push` for a quick schema sync) as part of your
-  deploy step.
-- **Frontend**: deployable to Vercel (recommended for Next.js) or any Node host. Set
-  `NEXT_PUBLIC_API_URL` as an environment variable at build time.
-- **Live deployment link**: add here once deployed — `<your-live-url>`
+```
+https://github.com/YOUR_USERNAME/Project-and-Team-Task-Management-Platform
+```
 
-## 5. Roles & permissions summary
+---
 
-| Action | Admin | Project Manager | Team Member |
-|---|:---:|:---:|:---:|
-| Manage user accounts & roles | ✅ | ❌ | ❌ |
-| Create / edit / delete any project | ✅ | Own projects only | ❌ |
-| Add / remove project members | ✅ | Own projects only | ❌ |
-| Create / assign / edit / delete tasks | ✅ | Within own projects | ❌ |
-| Update task status & comment | ✅ | ✅ | Own tasks only |
-| View dashboard | System-wide | Own projects | Own tasks |
+# License
 
-See [docs/UseCaseDiagram.md](docs/UseCaseDiagram.md) for the full breakdown.
-
-## AI tool usage
-
-This project was built with the assistance of **Claude** (Anthropic) — see
-[docs/Feature_Completion_Report.md](docs/Feature_Completion_Report.md#ai-tool-usage-disclosure)
-for details on which parts were AI-assisted.
-
-## Submission checklist
-
-- [x] GitHub repository (push this folder and make it public)
-- [ ] Short screen recording of the full app flow
-- [x] README with setup/run instructions (this file)
-- [x] `.env.example` for both backend and frontend
-- [ ] Live deployment link
-- [x] AI tool usage disclosed
-- [x] Entity Relationship Diagram
-- [x] Use Case Diagram
-- [x] System architecture diagram
-- [x] API documentation + Postman collection
-- [x] Feature completion report
-- [x] CI/CD workflow explanation
+This project was developed solely for the **CyphLab (Private) Limited – Intern Full Stack Developer Technical Assessment**.
