@@ -48,17 +48,14 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // Projects this user manages (as Project Manager)
   managedProjects Project[]        @relation("ProjectManager")
-  // Projects this user is a member of
   memberships     ProjectMember[]
-  // Tasks assigned to this user
   assignedTasks   Task[]           @relation("TaskAssignee")
-  // Tasks created by this user
   createdTasks    Task[]           @relation("TaskCreator")
   comments        Comment[]
   activityLogs    ActivityLog[]
   resetTokens     PasswordResetToken[]
+  uploadedFiles   TaskFile[]       // <-- ADDED: Files uploaded by this user
 
   @@index([role])
   @@map("users")
@@ -69,7 +66,7 @@ model Project {
   name        String
   description String?
   status      ProjectStatus @default(PLANNED)
-  progress    Int           @default(0) // <-- ADDED: Progress percentage (0-100)
+  progress    Int           @default(0)
   startDate   DateTime?
   endDate     DateTime?
   createdAt   DateTime      @default(now())
@@ -86,7 +83,6 @@ model Project {
   @@map("projects")
 }
 
-// Join table: which users belong to which projects (many-to-many with role context)
 model ProjectMember {
   id        String   @id @default(uuid())
   projectId String
@@ -122,6 +118,7 @@ model Task {
 
   comments    Comment[]
   activityLogs ActivityLog[]
+  files       TaskFile[]   // <-- ADDED: Files attached to this task
 
   @@index([projectId])
   @@index([assigneeId])
@@ -145,10 +142,9 @@ model Comment {
   @@map("comments")
 }
 
-// Audit trail for key actions across the system (used for Admin activity view)
 model ActivityLog {
   id        String   @id @default(uuid())
-  action    String   // e.g. "TASK_CREATED", "TASK_STATUS_CHANGED", "USER_ROLE_UPDATED"
+  action    String
   details   String?
   createdAt DateTime @default(now())
 
@@ -166,7 +162,6 @@ model ActivityLog {
   @@map("activity_logs")
 }
 
-// Password Reset Tokens for the "Forgot Password" feature
 model PasswordResetToken {
   id        String   @id @default(uuid())
   token     String   @unique
@@ -178,4 +173,23 @@ model PasswordResetToken {
   
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+// NEW: Task File model for file uploads
+model TaskFile {
+  id           String   @id @default(uuid())
+  name         String
+  size         Int      // File size in bytes
+  mimeType     String   // e.g., "application/pdf", "image/png"
+  url          String   // File URL or path
+  uploadedAt   DateTime @default(now())
+  
+  taskId       String
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  
+  @@index([taskId])
+  @@map("task_files")
 }
